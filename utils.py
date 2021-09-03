@@ -393,6 +393,33 @@ def write2canvas(imgs,spaces,indents,imgs_per_line):
         out.append(np.array(canvas)) # Append the canvas in a np array
     return out
 
+def crop_images(images):
+  """Trims the white space at the end of the word images.
+  
+  Args:
+      images (List[np.array]): An np.array of imgs of words in handwritten form. 
+      
+  Returns:
+      images (List[np.array]): An np.array of cropped imgs of words in handwritten form. 
+  """
+  count=0 # Initializing a count for images
+  for img in images:
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # Converting image to grayscale
+    height, width = img.shape # Getting the shape of image
+    height = height -1 
+    width = width-1
+    imgarr = np.sum(img, axis=0) # Summing every rows of each column to get 1d array
+    flag=0 
+    for i in range(width, -1, -1) :
+      if imgarr[i] <16320: # Checking if the current column is all white or not
+        img = img[0:height, 0:i+1] # Cropping the image
+        images[count] = img # Storing the cropped image in the original list 
+        count = count + 1 # Incrementing the count
+        flag=1 # Triggering the flag
+        break
+      if flag==1:
+        break
+  return images
 
 def postprocess_images(imgs, spaces, indents, imgs_per_line):
     """Converts the list of np.array to a pdf file.
