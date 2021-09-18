@@ -321,7 +321,8 @@ def convert_to_images(gen, text_dataloader, preprocessed_imgs, device):
     return imgs
 
 
-def write2canvas(imgs,spaces,indents,imgs_per_line):
+
+def write2canvas(imgs,spaces,indents,imgs_per_line,ht_in,wd_in,space_in):
     """Takes in all the images generated and writes them all in blank canvases in their correct positions as in the document. 
     One canvas is equivalent to one page in the document. 
     The function returns a list of canvas whose size is equal to the no. of pages in the document.
@@ -331,15 +332,17 @@ def write2canvas(imgs,spaces,indents,imgs_per_line):
         spaces (dict[set[int]]): Position of the spaces in each line.
         indents (dict[set[int]]): Position of the indents in each line.
         imgs_per_line (dict[set[int]]): Sum of images, spaces and indents in each line.
-        
+        ht_in (int): Top margin.
+        wd_in (int): Left margin.
+        space_in (int): Length of space.
     Returns:
         out (List[np.array[np.uint8]]): Array of images equivalent to the pages in the document.
     """
     w, h = 2500, 2700 # Setting page width
     data = np.zeros((h, w), dtype=np.uint8) # Creating np array of zeros of size h*w 
     data[0 : h, 0 : w] = 255 # Setting each value to RGB white value
-    
-    offset_w, offset_h = 20, 20 #Setting starting position of paste the images
+    indent_in = space_in * 4
+    offset_w, offset_h = ht_in,wd_in #Setting starting position of paste the images
     offset = 0, 0
     pages = math.ceil(len(imgs_per_line) / 30) # Finding no. of pages
     
@@ -355,24 +358,24 @@ def write2canvas(imgs,spaces,indents,imgs_per_line):
 
             for count in range(no_of_words): 
                 if count in sdct: #Checking if space is required
-                    offset_w = offset_w + 20 
+                    offset_w = offset_w + space_in + random.randint(15,20)
                     continue
 
                 if count in idct: #Checking if indent is required
-                    offset_w = offset_w + 80
+                    offset_w = offset_w + indent_in + random.randint(15,20)
                     continue
 
                 st = next(img) # Storing next image in a variable
                 st = resize_and_threshold(st, 127, 255)
                 st = im.fromarray(st)
                 st_w, st_h = st.size # Getting the image size
-                
-                offset = (offset_w, offset_h) # Set the pasting position for the new image
+                rand_offh = offset_h+random.randint(-5,5) 
+                offset = (offset_w, rand_offh) # Set the pasting position for the new image
                 canvas.paste(st, offset) # Overwrite the generated image over the canvas
                 offset_w = offset_w + st_w # Update the offset width
 
             offset_h = offset_h + 90 # Update the offset width
-            offset_w = 20
+            offset_w = wd_in + random.randint(0,7)
             line = line + 1 # Update the line no.
         # canvas.save('page'+str(page)+'.png')
         out.append(np.array(canvas)) # Append the canvas in a np array
