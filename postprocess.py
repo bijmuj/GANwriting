@@ -105,8 +105,7 @@ def imgs_to_pdf(imgs, id):
             im.fromarray(i).convert("RGB")
         )  # converting each array to PIL Image objects
 
-    pdf_path = "./temp/" + id + "/out.pdf"
-    new_imgs[0].save(pdf_path, save_all=True, append_images=new_imgs[1:])
+    new_imgs[0].save(id + "/out.pdf", save_all=True, append_images=new_imgs[1:])
 
 
 def postprocess_images(imgs, spaces, indents, imgs_per_line, id):
@@ -125,4 +124,4 @@ def postprocess_images(imgs, spaces, indents, imgs_per_line, id):
     # making pages out of the images.
     pages = write2canvas(imgs, spaces, indents, imgs_per_line)
     # saving the pages as a pdf, probably could've done it here itself.
-    imgs_to_pdf(pages, id)
+    return imgs_to_pdf(pages, id)

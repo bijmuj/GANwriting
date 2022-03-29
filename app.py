@@ -1,3 +1,5 @@
+import tempfile
+
 from flask import Flask, after_this_request, render_template, request, send_file
 
 import postprocess
@@ -26,19 +28,20 @@ def root():
         return render_template(TEMPLATE_PATH)
     else:
         # create a random run id
-        id = utils.get_run_id()
+        temp_dir = tempfile.TemporaryDirectory()
+        id = temp_dir.name
         # Doing this so cleanup still runs afterwards.
 
         @after_this_request
         def cleanup(f):
             try:
-                utils.cleanup_temp_files(id)
-            except Exception:
-                print("Cleanup failed")
+                temp_dir.cleanup()
+            except PermissionError:
+                print("Permission Error.")
             return f
 
         handle_post(request, id)
-        path = "./temp/" + id + "/out.pdf"
+        path = id + "/out.pdf"
         return send_file(path, as_attachment=True)
 
 

@@ -43,7 +43,9 @@ def get_model():
 
 
 def get_run_id():
-    """Produces a random string of lowercase ascii characters of size 10 to serve as a run id.
+    """REPLACED WITH TEMPFILE.
+
+    Produces a random string of lowercase ascii characters of size 10 to serve as a run id.
     Also creates a dir of the same name in ./temp to store run artifacts temporarily.
     Ensures that the id is not currently in use by checking for existing dir of same name.
 
@@ -131,7 +133,8 @@ def convert_to_images(gen, text_dataloader, preprocessed_imgs, device):
 
 
 def cleanup_temp_files(id):
-    """Deletes current temp dir including all its files.
+    """REPLACED WITH TEMPFILE MODULE.
+    Deletes current temp dir including all its files.
     Is actually a ticking timebonb. Will surely break somthing.
 
     Args:
@@ -156,28 +159,40 @@ def cleanup_temp_files(id):
             print(pdf, "failed to delete")
 
 
-def convert_pic_to_mini_array(path):
+def convert_pic_to_mini_array(image):
     """
     Crop out images of individual handwrittten words from the whole image.
 
     Args:
-        path (string): Path to the image file having handwritten text.
+        image (PIL.Image): The image file having handwritten text.
 
     Returns:
         cropped_images (List[np.array]): A list of np.array of imgs of words cropped out from
         the source image.
     """
-    img = cv2.imread(path)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    image = np.array(image.convert("RGB"))
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     ret, thresh1 = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY_INV)
-    rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))
+    rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 20))
     dilation = cv2.dilate(thresh1, rect_kernel, iterations=1)
     contours, hierarchy = cv2.findContours(dilation, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    im2 = img.copy()
+    # im2 = img.copy()
     cropped_images = []
     for cnt in contours:
         x, y, w, h = cv2.boundingRect(cnt)
-        cropped = im2[y : y + h, x : x + w]
+        cropped = image[y : y + h, x : x + w]
         cropped_images.append(np.array(cropped))
 
     return cropped_images
+
+
+def filter_mini_array(images):
+    heights = []
+    for image in images:
+        heights.append(image.shape[0])
+    mean_height = np.mean(np.array(heights))
+    filtered_images = []
+    for height, image in zip(heights, images):
+        if height > 0.6 * mean_height:
+            filtered_images.append(image)
+    return filtered_images

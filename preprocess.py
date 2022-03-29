@@ -25,7 +25,7 @@ def convert_files(id, imgs, text):
     the text file into a string.
 
     Args:
-        id (string): An identifier for the run, used as the name for a temp directory.
+        id (string): An identifier for the run, used as the path for a temp directory.
         imgs (List[file]): A list of image files to convert.
         text (file): The document file to convert.
 
@@ -36,12 +36,12 @@ def convert_files(id, imgs, text):
     new_imgs = []
     for i, img in enumerate(imgs):
         # Current directory to save images in.
-        img_path = "./temp/" + id + f"/{str(i)}" + ".jpg"
+        img_path = id + f"/{str(i)}" + ".jpg"
         img.save(img_path)
         new_img = im.open(img_path).convert("RGB")
         new_imgs.append(new_img)
 
-    text_path = "./temp/" + id + "/text.docx"
+    text_path = id + "/text.docx"
     text.save(text_path)
     new_text = docx2txt.process(text_path)
 
