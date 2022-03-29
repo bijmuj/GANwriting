@@ -391,7 +391,7 @@ def write2canvas(imgs, spaces, indents, imgs_per_line, ht_in=0, wd_in=0, space_i
                     continue
 
                 st = next(img)  # Storing next image in a variable
-                # st = resize_and_threshold(st, 127, 255)
+                st = resize_and_threshold(st, 127, 255)
                 st = im.fromarray(st)
                 st_w, st_h = st.size  # Getting the image size
                 rand_offh = offset_h + random.randint(-5, 5)
