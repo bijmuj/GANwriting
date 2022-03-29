@@ -1,30 +1,15 @@
 import glob
-import math
 import os
 import random
 import string
-from collections import defaultdict
 
 import cv2
-import docx2txt
 import numpy as np
 import torch
 import wandb
-from PIL import Image as im
-from torch.utils.data import DataLoader, TensorDataset
 
 from config import WAND_API_KEY
 from models import GenModel_FC
-
-# special tokens
-START = 0
-STOP = 1
-PADDING = 2
-
-
-# + 3 (because of the START, STOP and PADDING)
-letter2index = {l: n + 3 for n, l in enumerate(string.ascii_letters)}
-index2letter = {n + 3: l for n, l in enumerate(string.ascii_letters)}
 
 
 def get_model():
@@ -74,180 +59,6 @@ def get_run_id():
     return id
 
 
-def convert_files(id, imgs, text):
-    """Converts the image files received through request into PIL Images and
-    the text file into a string.
-
-    Args:
-        id (string): An identifier for the run, used as the name for a temp directory.
-        imgs (List[file]): A list of image files to convert.
-        text (file): The document file to convert.
-
-    Returns:
-        new_imgs (List[Image]): A list of PIL Image objects, to be preprocessed.
-        new_text (string): The text file converted to string form.
-    """
-    new_imgs = []
-    for i, img in enumerate(imgs):
-        # Current directory to save images in.
-        img_path = "./temp/" + id + f"/{str(i)}" + ".jpg"
-        img.save(img_path)
-        new_img = im.open(img_path).convert("RGB")
-        new_imgs.append(new_img)
-
-    text_path = "./temp/" + id + "/text.docx"
-    text.save(text_path)
-    new_text = docx2txt.process(text_path)
-
-    return new_imgs, new_text
-
-
-def strip(s):
-    return s.rstrip()
-
-
-def update_dicts(w, words, d, imgs_per_line, idx):
-    """Updates the given dict as well as imgs_per_line and words list.
-
-    Args:
-        w (string): Current word.
-        words (List[string]): The list of found words.
-        d (dict[set[int]]): The dict to be updated.
-        imgs_per_line (dict[int]): A dict of ints to store number of images in each line.
-        idx (int): An index to the above dicts and list.
-    """
-    if len(w):
-        words.append("".join(w))
-        imgs_per_line[idx] += (len(w) - 1) // 10 + 1
-
-    d[idx].add(imgs_per_line[idx])
-    imgs_per_line[idx] += 1
-
-
-def get_words(text):
-    """Converts a long string of text into constituent words, and
-    produces a dict of indices to put the spaces and indents.
-    Each word is counted as one or more images depending on its size.
-    Each line is considered as an array of images.
-    The spaces and indents dicts have indices to where the spaces and indents would be in the array.
-    Each space and indent counts as one image.
-
-    Args:
-        text (string): The document to convert in string form.
-
-    Returns:
-        words (List[List[string]]): A list of lists of words.
-        spaces (dict[set[int]]): A dict of sets where each key in the dict refers to the line
-            number and each item in the sets refer to indices of spaces.
-        indents (dict[set[int]]): A dict of sets where each key in the dict refers to the line
-            number and each item in the sets refer to indices of indents.
-        imgs_per_line (dict[int]): A dict of the number of images in each line.
-    """
-    lines = list(map(strip, text.split("\n")))[::2]
-
-    words = []
-    spaces = defaultdict(set)
-    indents = defaultdict(set)
-    imgs_per_line = defaultdict(int)
-
-    for i, line in enumerate(lines):
-        w = []
-        for c in line:
-            if c == "\t":
-                update_dicts(w, words, indents, imgs_per_line, i)
-                w = []
-
-            elif c == " ":
-                update_dicts(w, words, spaces, imgs_per_line, i)
-                w = []
-
-            else:
-                w.append(c)
-
-        if len(w):
-            words.append("".join(w))
-            imgs_per_line[i] += (len(w) - 1) // 10 + 1
-
-    return words, spaces, indents, imgs_per_line
-
-
-def convert_and_pad(word):
-    """Converts the word to a list of tokens padded to read length 12.
-
-    Args:
-        word (string): A string of characters of max length 10.
-
-    Returns:
-       new_word (List[int]): A list of ints representing the tokens.
-    """
-    new_word = []
-    for w in word:
-        if w in letter2index:
-            # Converting each character to its token value, ignoring non alphabetic characters
-            new_word.append(letter2index[w])
-    new_word = [START] + new_word + [STOP]  # START + chars + STOP
-    if len(new_word) < 12:  # if too short, pad with PADDING token
-        new_word.extend([PADDING] * (12 - len(new_word)))
-    return new_word
-
-
-def preprocess_text(text, max_input_size=10):
-    """Converts the each word into a list of tokens, bounded by start and end token.
-    Padding tokens added if necessary to reach max_input_size and splitting if the original
-    word is too long.
-
-    Args:
-        text (string): The document to convert in string form.
-        max_input_size (int): The max number of tokens in each input
-
-    Returns:
-        (torch.data.utils.DataLoader): A dataloader to the dataset of words converted to tensors
-            with batch size 8.
-        spaces (dict[set[int]]): A dict of sets where each key in the dict refers to the line
-            number and each item in the sets refer to indices of spaces.
-        indents (dict[set[int]]): A dict of sets where each key in the dict refers to the line
-            number and each item in the sets refer to indices of indents.
-        imgs_per_line (dict[int]): A dict of the number of images in each line.
-    """
-    words, spaces, indents, imgs_per_line = get_words(text)
-    new_words = []
-
-    for w in words:
-        w_len = len(w)
-        while w_len > 0:
-            new_words.append(convert_and_pad(w[:max_input_size]))
-            w = w[max_input_size:]
-            w_len -= max_input_size
-
-    new_words = torch.from_numpy(np.array(new_words))
-    dataset = TensorDataset(new_words)
-
-    return DataLoader(dataset, batch_size=8, shuffle=False), spaces, indents, imgs_per_line
-
-
-def shuffle_and_repeat(imgs):
-    """Takes the original list or images, shuffles them and if there are less than 50 images,
-    repeats them until we get 50.
-
-    Args:
-        imgs (List[np.array]): A list of images as numpy arrays.
-
-    Returns:
-        new_imgs (List[np.array]): A list of images as numpy arrays of size 50.
-    """
-    new_imgs = []
-    orig_len = len(imgs)
-    idx = orig_len
-    shuf = list(range(orig_len))
-    while len(new_imgs) < 50:
-        if idx == orig_len:
-            random.shuffle(shuf)
-            idx = 0
-        new_imgs.append(imgs[shuf[idx]])
-        idx += 1
-    return new_imgs
-
-
 def resize_and_threshold(img, thresh, high):
     """Resizes the image to (216, 64) and does Otsu's thresholding on it.
 
@@ -268,32 +79,8 @@ def resize_and_threshold(img, thresh, high):
     return img
 
 
-def preprocess_images(imgs):
-    """Rescales, resizes and binarizes a batch of images of handwritten words and
-    returns it as a tensor. If there are less than 50 images, the original list is shuffled
-    and repeated until 50 is reached.
-
-    Args:
-        imgs (List[Image]): Original batch of handwritten word image.
-
-    Returns:
-        (torch.tensor): Preprocessed word image batch, pixels will be in range -1..1.
-    """
-    new_imgs = []
-    for i in imgs:
-        i = np.array(i)
-        i = resize_and_threshold(i, 0.5, 1)
-        i = np.float32(i)
-        i = 1 - i
-        i = (i - 0.5) / 0.5
-        new_imgs.append(i)
-    new_imgs = shuffle_and_repeat(new_imgs)
-    new_imgs = np.array(new_imgs).reshape((1, 50, 64, 216))
-    return torch.from_numpy(new_imgs)
-
-
-def normalize(img):
-    """Normalizes images to the range 0..255.
+def denormalize(img):
+    """Denormalizes images to the range 0..255.
 
     Args:
         img (np.array): 3D array of floats.
@@ -338,130 +125,9 @@ def convert_to_images(gen, text_dataloader, preprocessed_imgs, device):
             xg = gen.decode(f_mix, f_xt).cpu().detach().numpy()
 
             for x in xg:
-                imgs.append(normalize(x.squeeze()))
+                imgs.append(denormalize(x.squeeze()))
 
     return imgs
-
-
-def write2canvas(imgs, spaces, indents, imgs_per_line, ht_in=0, wd_in=0, space_in=20, indent_in=80):
-    """Takes in all the images generated and writes them all in blank canvases
-    in their correct positions as in the document. One canvas is equivalent to one page
-    in the document. The function returns a list of canvas whose size is equal to the
-    no. of pages in the document.
-
-    Args:
-        imgs (List[np.array[np.uint8]]): Images generated by the generator
-        spaces (dict[set[int]]): Position of the spaces in each line.
-        indents (dict[set[int]]): Position of the indents in each line.
-        imgs_per_line (dict[set[int]]): Sum of images, spaces and indents in each line.
-        ht_in (int): Top margin.
-        wd_in (int): Left margin.
-        space_in (int): Length of space preferably 20.
-        indent_in (int): Length of indents preferably 4*space_in.
-    Returns:
-        out (List[np.array[np.uint8]]): Array of images equivalent to the pages in the document.
-    """
-    w, h = 2500, 2700  # Setting page size
-    data = np.zeros((h, w), dtype=np.uint8)  # Creating np array of zeros of size h*w
-    data[0:h, 0:w] = 255  # Setting each value to RGB white value
-
-    offset_w, offset_h = wd_in, ht_in  # Setting starting position of paste the images
-    offset = 0, 0
-    pages = math.ceil(len(imgs_per_line) / 30)  # Finding no. of pages
-
-    out = []
-    img = iter(imgs)  # Iterator for images of all the generated images of words
-    for page in range(pages):
-        line = 0
-        canvas = im.fromarray(
-            data
-        )  # Creating new PIL image canvas to overwrite the generated images on it
-        while offset_h < h:
-            no_of_words = imgs_per_line[line]
-            sdct = spaces[line]  # Extracting the space set for the current line
-            idct = indents[line]  # Extracting the indent set for the current line
-
-            for count in range(no_of_words):
-                if count in sdct:  # Checking if space is required
-                    offset_w = offset_w + space_in + random.randint(-5, 5)
-                    continue
-
-                if count in idct:  # Checking if indent is required
-                    offset_w = offset_w + indent_in + random.randint(-10, 10)
-                    continue
-
-                st = next(img)  # Storing next image in a variable
-                st = resize_and_threshold(st, 127, 255)
-                st = im.fromarray(st)
-                st_w, st_h = st.size  # Getting the image size
-                rand_offh = offset_h + random.randint(-5, 5)
-                offset = (offset_w, rand_offh)  # Set the pasting position for the new image
-                canvas.paste(st, offset)  # Overwrite the generated image over the canvas
-                offset_w = offset_w + st_w  # Update the offset width
-
-            offset_h = offset_h + 90  # Update the offset width
-            offset_w = wd_in + random.randint(0, 7)
-            line = line + 1  # Update the line no.
-        # canvas.save('page'+str(page)+'.png')
-        out.append(np.array(canvas))  # Append the canvas in a np array
-    return out
-
-
-def crop_images(imgs):
-    """Removes trailing whitespaces from images.
-
-    Args:
-        imgs (List[np.array[np.uint8]]): A list of grayscale images as 2D np arrays.
-
-    Returns:
-        imgs (List[np.array[np.uint8]]): A list of grayscale images as 2D np arrays
-            without trailing whitespaces.
-    """
-    for idx, img in enumerate(imgs):
-        w = img.shape[1] - 1
-        sums = np.sum(img, axis=0)
-        for i in range(w, -1, -1):
-            if sums[i] < 16320:
-                img = img[:, : i + 1]
-                break
-        imgs[idx] = img
-    return imgs
-
-
-def imgs_to_pdf(imgs, id):
-    """Converts the page images to pdf.
-
-    Args:
-        imgs (List[np.array[np.uint8]]):
-        id (string): An identifier for the run, used as the name for a temp directory.
-    """
-    new_imgs = []
-    for i in imgs:
-        new_imgs.append(
-            im.fromarray(i).convert("RGB")
-        )  # converting each array to PIL Image objects
-
-    pdf_path = "./temp/" + id + "/out.pdf"
-    new_imgs[0].save(pdf_path, save_all=True, append_images=new_imgs[1:])
-
-
-def postprocess_images(imgs, spaces, indents, imgs_per_line, id):
-    """Converts the imgs to a pdf file.
-
-    Args:
-        imgs (List[np.array]): An np.array of imgs of words in handwritten form.
-        spaces (dict[set[int]]): A dict of sets of ints containing positions of spaces in each line.
-        indents (dict[set[int]]): A dict of sets of ints containing the positions of indents in
-            each line.
-        imgs_per_line (dict[int]): A dict of ints containing number of images to put in each line.
-        id (string): An identifier for the run, used as the name for a temp directory.
-    """
-    # removing trailing whitespaces.
-    imgs = crop_images(imgs)
-    # making pages out of the images.
-    pages = write2canvas(imgs, spaces, indents, imgs_per_line)
-    # saving the pages as a pdf, probably could've done it here itself.
-    imgs_to_pdf(pages, id)
 
 
 def cleanup_temp_files(id):

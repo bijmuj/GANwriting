@@ -1,5 +1,7 @@
 from flask import Flask, after_this_request, render_template, request, send_file
 
+import postprocess
+import preprocess
 import utils
 
 TEMPLATE_PATH = "home.html"
@@ -52,15 +54,15 @@ def handle_post(request, id):
     # Take the received files and convert into required formats
     imgs = request.files.getlist("images[]")
     text = request.files["document"]
-    imgs, text = utils.convert_files(id, imgs, text)
+    imgs, text = preprocess.convert_files(id, imgs, text)
 
     # Preprocessing the handwritting images
-    preprocessed_imgs = utils.preprocess_images(imgs)
+    preprocessed_imgs = preprocess.preprocess_images(imgs)
 
     # Preprocessing the text
-    text_dataloader, spaces, indents, imgs_per_line = utils.preprocess_text(text)
+    text_dataloader, spaces, indents, imgs_per_line = preprocess.preprocess_text(text)
 
     # Converting to images
     imgs = utils.convert_to_images(gen, text_dataloader, preprocessed_imgs, device)
 
-    utils.postprocess_images(imgs, spaces, indents, imgs_per_line, id)
+    postprocess.postprocess_images(imgs, spaces, indents, imgs_per_line, id)
