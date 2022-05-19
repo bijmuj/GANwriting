@@ -12,7 +12,7 @@ from config import WAND_API_KEY
 from models import GenModel_FC
 
 
-def get_model():
+def get_model(download=False):
     """Downloads the model artifact from wandb and loads the weights from it
     into a new generator object.
 
@@ -21,13 +21,14 @@ def get_model():
         device (string): The device the model is on (cuda/cpu).
     """
     os.environ["WANDB_API_KEY"] = WAND_API_KEY
-
-    api = wandb.Api()
-    artifact = api.artifact(
-        "bijin/GANwriting_Reproducibilty_Challenge/GANwriting:v237", type="model"
-    )
-    model_dir = artifact.download() + "/contran-5000.model"
-
+    if download:
+        api = wandb.Api()
+        artifact = api.artifact(
+            "bijin/GANwriting_Reproducibilty_Challenge/GANwriting:v237", type="model"
+        )
+        model_dir = artifact.download() + "/contran-5000.model"
+    else:
+        model_dir = "./artifacts/GANwriting-v237/contran-5000.model"
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     weights = torch.load(model_dir, map_location=torch.device("cpu"))
     gen = GenModel_FC(12)
@@ -170,7 +171,7 @@ def convert_pic_to_mini_array(image):
         cropped_images (List[np.array]): A list of np.array of imgs of words cropped out from
         the source image.
     """
-    image = np.array(image.convert("RGB"))
+    # image = np.array(image.convert("RGB"))
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     ret, thresh1 = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY_INV)
     rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 20))

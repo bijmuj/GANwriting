@@ -124,4 +124,4 @@ def postprocess_images(imgs, spaces, indents, imgs_per_line, id):
     # making pages out of the images.
     pages = write2canvas(imgs, spaces, indents, imgs_per_line)
     # saving the pages as a pdf, probably could've done it here itself.
-    return imgs_to_pdf(pages, id)
+    imgs_to_pdf(pages, id)
