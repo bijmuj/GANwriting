@@ -171,7 +171,7 @@ def convert_pic_to_mini_array(image):
         cropped_images (List[np.array]): A list of np.array of imgs of words cropped out from
         the source image.
     """
-    # image = np.array(image.convert("RGB"))
+    image = np.array(image)
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     ret, thresh1 = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY_INV)
     rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 20))
@@ -188,6 +188,14 @@ def convert_pic_to_mini_array(image):
 
 
 def filter_mini_array(images):
+    """Filter mini array of tiny images.
+
+    Args:
+        images (List[np.array]): List of images to filter.
+
+    Returns:
+        List[np.array]: Array of filtered images.
+    """
     heights = []
     for image in images:
         heights.append(image.shape[0])

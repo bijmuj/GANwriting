@@ -14,7 +14,9 @@ def handle_inputs(word_doc, image_file, ht_in, wd_in, space_in, indent_in):
     try:
         # temp_dir = tempfile.TemporaryDirectory(dir="./temp")
         text = docx2txt.process(word_doc)
-        image_array = [im.open(image_file).convert("RGB")]
+        image = im.open(image_file).convert("RGB")
+        image_array = utils.convert_pic_to_mini_array(image)
+        image_array = utils.filter_mini_array(image_array)
 
         with st.spinner("Processing..."):
             preprocessed_imgs = preprocess.preprocess_images(image_array)
@@ -33,9 +35,6 @@ def handle_inputs(word_doc, image_file, ht_in, wd_in, space_in, indent_in):
                 indent_in=indent_in,
             )
             st.success("Done.")
-        for i in imgs:
-            st.image(i, width=400)
-        # postprocess.imgs_to_pdf(imgs, "./temp")
 
         st.download_button(
             "Download file",
@@ -62,8 +61,8 @@ def main():
 
     with col2:
         st.header("Other parameters:")
-        ht_in = st.slider("Top margin:", 0, 20, 0, 1)
-        wd_in = st.slider("Left margin:", 0, 20, 0, 1)
+        ht_in = st.slider("Top margin:", 0, 100, 50, 5)
+        wd_in = st.slider("Left margin:", 0, 100, 50, 5)
         space_in = st.slider("Space width:", 10, 40, 20, 5)
         indent_in = st.slider("Indent width:", 10, 120, 80, 5)
 
