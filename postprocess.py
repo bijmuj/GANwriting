@@ -1,10 +1,9 @@
 import math
 import random
 
+import cv2
 import numpy as np
 from PIL import Image as im
-
-import utils
 
 
 def write2canvas(imgs, spaces, indents, imgs_per_line, ht_in=0, wd_in=0, space_in=20, indent_in=80):
@@ -25,22 +24,17 @@ def write2canvas(imgs, spaces, indents, imgs_per_line, ht_in=0, wd_in=0, space_i
     Returns:
         out (List[np.array[np.uint8]]): Array of images equivalent to the pages in the document.
     """
-    w, h = 2500, 2700  # Setting page size
-    data = np.zeros((h, w), dtype=np.uint8)  # Creating np array of zeros of size h*w
-    data[0:h, 0:w] = 255  # Setting each value to RGB white value
-
-    offset = 0, 0
+    w, h = 2000, 2700  # Setting page size
     pages = math.ceil(len(imgs_per_line) / 30)  # Finding no. of pages
 
     out = []
     img = iter(imgs)  # Iterator for images of all the generated images of words
-    offset_w, offset_h = wd_in, ht_in  # Setting starting position of paste the images
+    offset_w = wd_in  # Setting starting position of paste the images
+    offset_h = ht_in
 
     for page in range(pages):
         line = 0
-        canvas = im.fromarray(
-            data
-        )  # Creating new PIL image canvas to overwrite the generated images on it
+        canvas = im.new("RGB", (w, h), (255, 255, 255))
         while offset_h < h:
             no_of_words = imgs_per_line[line]
             sdct = spaces[line]  # Extracting the space set for the current line
@@ -49,15 +43,20 @@ def write2canvas(imgs, spaces, indents, imgs_per_line, ht_in=0, wd_in=0, space_i
             for count in range(no_of_words):
                 if count in sdct:  # Checking if space is required
                     offset_w += space_in + random.randint(-5, 5)
+                    # pass
                 elif count in idct:  # Checking if indent is required
                     offset_w += indent_in + random.randint(-10, 10)
+                    # pass
                 else:
                     st = next(img)  # Storing next image in a variable
-                    st = utils.resize_and_threshold(st, 127, 255)
+                    _, st = cv2.threshold(st, 127, 255, cv2.THRESH_OTSU)
+                    st = cv2.erode(st, np.ones((2, 2), dtype=np.uint8))
                     st = im.fromarray(st)
                     st_w, st_h = st.size  # Getting the image size
-                    rand_offh = offset_h + random.randint(-5, 5)
-                    offset = (offset_w, rand_offh)  # Set the pasting position for the new image
+                    offset = (
+                        offset_w,
+                        offset_h + random.randint(-5, 5),
+                    )  # Set the pasting position for the new image
                     canvas.paste(st, offset)  # Overwrite the generated image over the canvas
                     offset_w = offset_w + st_w  # Update the offset width
 
@@ -83,7 +82,7 @@ def crop_images(imgs):
         w = img.shape[1] - 1
         sums = np.sum(img, axis=0)
         for i in range(w, -1, -1):
-            if sums[i] < 16320:
+            if sums[i] < 13770:
                 img = img[:, : i + 1]
                 break
         imgs[idx] = img

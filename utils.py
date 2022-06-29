@@ -16,17 +16,20 @@ def get_model(download=False):
     """Downloads the model artifact from wandb and loads the weights from it
     into a new generator object.
 
+    Args:
+        download (bool, optional): Download latest model. Defaults to False.
+
     Returns:
         gen (torch.nn.module): The pretrained generator model.
         device (string): The device the model is on (cuda/cpu).
-    """
-    os.environ["WANDB_API_KEY"] = WAND_API_KEY
+    """    
     if download:
+        os.environ["WANDB_API_KEY"] = WAND_API_KEY
         api = wandb.Api()
         artifact = api.artifact(
-            "bijin/GANwriting_Reproducibilty_Challenge/GANwriting:v237", type="model"
+            "bijin/GANwriting_Reproducibilty_Challenge/GANwriting:latest", type="model"
         )
-        model_dir = artifact.download() + "/contran-5000.model"
+        model_dir = artifact.download() + "/ganwriting.model"
     else:
         model_dir = "./artifacts/GANwriting-v237/contran-5000.model"
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
