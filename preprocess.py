@@ -194,7 +194,7 @@ def shuffle_and_repeat(imgs):
     return new_imgs
 
 
-def preprocess_images(imgs):
+def preprocess_images(imgs) -> torch.tensor:
     """Rescales, resizes and binarizes a batch of images of handwritten words and
     returns it as a tensor. If there are less than 50 images, the original list is shuffled
     and repeated until 50 is reached.
@@ -203,7 +203,7 @@ def preprocess_images(imgs):
         imgs (List[Image]): Original batch of handwritten word image.
 
     Returns:
-        (torch.tensor): Preprocessed word image batch, pixels will be in range -1..1.
+        torch.tensor: Preprocessed word image batch, pixels will be in range -1..1.
     """
     new_imgs = []
     for i in imgs:
@@ -214,5 +214,5 @@ def preprocess_images(imgs):
         i = (i - 0.5) / 0.5
         new_imgs.append(i)
     new_imgs = shuffle_and_repeat(new_imgs)
-    new_imgs = np.array(new_imgs).reshape((1, 50, 64, 216))
-    return torch.from_numpy(new_imgs)
+    new_imgs = torch.tensor(new_imgs)
+    return new_imgs.unsqueeze(0)
